@@ -198,31 +198,35 @@ export default function Panel() {
         />
       ) : (
         <>
-          <List label="Audit events">
-            {filtered.slice(-100).map((e) => (
-              <ListItem
-                key={e.id}
-                title={e.title}
-                description={`${timeOf(e.ts)}${e.terminalTitle ? ` · ${e.terminalTitle}` : ''}`}
-                icon={e.kind === 'output' ? 'terminal' : e.kind === 'tool' ? 'wrench' : 'activity'}
-                current={selected?.id === e.id}
-                onPress={() => set(selectedId, e.id)}
-              />
-            ))}
-          </List>
+          <Box grow scroll="y" minHeight={0}>
+            <List label="Audit events">
+              {filtered.slice(-100).map((e) => (
+                <ListItem
+                  key={e.id}
+                  title={e.title}
+                  description={`${timeOf(e.ts)}${e.terminalTitle ? ` · ${e.terminalTitle}` : ''}`}
+                  icon={e.kind === 'output' ? 'terminal' : e.kind === 'tool' ? 'wrench' : 'activity'}
+                  current={selected?.id === e.id}
+                  onPress={() => set(selectedId, e.id)}
+                />
+              ))}
+            </List>
+          </Box>
           {selected ? (
-            <Card title={selected.title}>
-              <Stack gap="xs">
-                <Row gap="xs">
-                  <Badge tone={KIND_TONE[selected.kind]}>{KIND_LABEL[selected.kind]}</Badge>
-                  <Text size="xs" muted>
-                    {new Date(selected.ts).toLocaleString()}
-                    {selected.terminalId ? ` · ${selected.terminalId}` : ''}
-                  </Text>
-                </Row>
-                <Code block>{detailLines(selected) || '(no detail)'}</Code>
-              </Stack>
-            </Card>
+            <Box maxHeight={280} scroll="y">
+              <Card title={selected.title}>
+                <Stack gap="xs">
+                  <Row gap="xs">
+                    <Badge tone={KIND_TONE[selected.kind]}>{KIND_LABEL[selected.kind]}</Badge>
+                    <Text size="xs" muted>
+                      {new Date(selected.ts).toLocaleString()}
+                      {selected.terminalId ? ` · ${selected.terminalId}` : ''}
+                    </Text>
+                  </Row>
+                  <Code block>{detailLines(selected) || '(no detail)'}</Code>
+                </Stack>
+              </Card>
+            </Box>
           ) : null}
         </>
       )}
