@@ -33,8 +33,7 @@ const loading = atom(true)
 const kindFilter = atom('kind', 'all', { persist: 'plugin' })
 const search = atom('search', '', { persist: 'plugin' })
 const selectedId = atom<number | null>(null)
-const feedHeight = atom('feedHeight', 360, { persist: 'plugin' })
-const detailHeight = atom('detailHeight', 200, { persist: 'plugin' })
+const contentHeight = atom('contentHeight', 560, { persist: 'plugin' })
 
 const KIND_LABEL: Record<AuditEvent['kind'], string> = {
   output: 'Output',
@@ -114,8 +113,11 @@ export default function Panel() {
   const q = read(search)
   const selId = read(selectedId)
   const isLoading = read(loading)
-  const fHeight = read(feedHeight)
-  const dHeight = read(detailHeight)
+  const cHeight = read(contentHeight)
+  // One control sizes the whole feed + detail block; the detail pane keeps a
+  // fixed 200px and the feed takes the rest.
+  const DETAIL_H = 200
+  const fHeight = Math.max(200, cHeight - DETAIL_H)
 
   const filtered = list.filter((e) => matches(e, kind, q))
   const selected = filtered.find((e) => e.id === selId) ?? filtered[filtered.length - 1]
@@ -186,26 +188,15 @@ export default function Panel() {
       ) : null}
 
       <Collapsible title="Layout" description="Resize the feed and detail panes">
-        <Stack gap="sm">
-          <Slider
-            label="Feed height"
-            value={fHeight}
-            min={200}
-            max={600}
-            step={20}
-            showValue
-            onChange={(v) => set(feedHeight, v)}
-          />
-          <Slider
-            label="Detail height"
-            value={dHeight}
-            min={120}
-            max={360}
-            step={20}
-            showValue
-            onChange={(v) => set(detailHeight, v)}
-          />
-        </Stack>
+        <Slider
+          label="Content height"
+          value={cHeight}
+          min={420}
+          max={900}
+          step={20}
+          showValue
+          onChange={(v) => set(contentHeight, v)}
+        />
       </Collapsible>
 
       <Separator />
@@ -244,7 +235,7 @@ export default function Panel() {
             <>
               <Separator />
               <Box
-                height={dHeight}
+                height={DETAIL_H}
                 scroll="y"
                 background="card"
                 border
