@@ -5,7 +5,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Code,
   EmptyState,
   Heading,
@@ -223,18 +222,19 @@ export default function Panel() {
                 radius="md"
                 padding="sm"
               >
-                <Card title={selected.title}>
-                  <Stack gap="xs">
-                    <Row gap="xs">
-                      <Badge tone={KIND_TONE[selected.kind]}>{KIND_LABEL[selected.kind]}</Badge>
-                      <Text size="xs" muted>
-                        {new Date(selected.ts).toLocaleString()}
-                        {selected.terminalId ? ` · ${selected.terminalId}` : ''}
-                      </Text>
-                    </Row>
-                    <Code block>{detailLines(selected) || '(no detail)'}</Code>
-                  </Stack>
-                </Card>
+                <Stack gap="xs">
+                  <Text weight="medium" truncate>
+                    {selected.title}
+                  </Text>
+                  <Row gap="xs">
+                    <Badge tone={KIND_TONE[selected.kind]}>{KIND_LABEL[selected.kind]}</Badge>
+                    <Text size="xs" muted>
+                      {new Date(selected.ts).toLocaleString()}
+                      {selected.terminalId ? ` · ${selected.terminalId}` : ''}
+                    </Text>
+                  </Row>
+                  <Code block>{detailLines(selected) || '(no detail)'}</Code>
+                </Stack>
               </Box>
             </>
           ) : null}
