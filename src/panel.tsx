@@ -127,7 +127,7 @@ export default function Panel() {
     .join(' · ')
 
   return (
-    <Box direction="column" gap="md" height="100%">
+    <Box direction="column" gap="md">
       <Row justify="between">
         <Heading>Observability</Heading>
         <Row gap="xs">
@@ -197,7 +197,7 @@ export default function Panel() {
         />
       ) : (
         <>
-          <Box grow scroll="y" minHeight={0}>
+          <Box height={360} scroll="y" minHeight={0}>
             <List label="Audit events">
               {filtered.slice(-100).map((e) => (
                 <ListItem
@@ -215,7 +215,7 @@ export default function Panel() {
             <>
               <Separator />
               <Box
-                maxHeight={280}
+                height={200}
                 scroll="y"
                 background="card"
                 border
