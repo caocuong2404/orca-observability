@@ -128,7 +128,7 @@ export default function Panel() {
     .join(' · ')
 
   return (
-    <Stack gap="md">
+    <Box direction="column" gap="md" height="100%">
       <Row justify="between">
         <Heading>Observability</Heading>
         <Row gap="xs">
@@ -213,23 +213,33 @@ export default function Panel() {
             </List>
           </Box>
           {selected ? (
-            <Box maxHeight={280} scroll="y">
-              <Card title={selected.title}>
-                <Stack gap="xs">
-                  <Row gap="xs">
-                    <Badge tone={KIND_TONE[selected.kind]}>{KIND_LABEL[selected.kind]}</Badge>
-                    <Text size="xs" muted>
-                      {new Date(selected.ts).toLocaleString()}
-                      {selected.terminalId ? ` · ${selected.terminalId}` : ''}
-                    </Text>
-                  </Row>
-                  <Code block>{detailLines(selected) || '(no detail)'}</Code>
-                </Stack>
-              </Card>
-            </Box>
+            <>
+              <Separator />
+              <Box
+                maxHeight={280}
+                scroll="y"
+                background="card"
+                border
+                radius="md"
+                padding="sm"
+              >
+                <Card title={selected.title}>
+                  <Stack gap="xs">
+                    <Row gap="xs">
+                      <Badge tone={KIND_TONE[selected.kind]}>{KIND_LABEL[selected.kind]}</Badge>
+                      <Text size="xs" muted>
+                        {new Date(selected.ts).toLocaleString()}
+                        {selected.terminalId ? ` · ${selected.terminalId}` : ''}
+                      </Text>
+                    </Row>
+                    <Code block>{detailLines(selected) || '(no detail)'}</Code>
+                  </Stack>
+                </Card>
+              </Box>
+            </>
           ) : null}
         </>
       )}
-    </Stack>
+    </Box>
   )
 }
