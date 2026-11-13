@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Code,
+  Collapsible,
   EmptyState,
   Heading,
   Input,
@@ -16,6 +17,7 @@ import {
   Row,
   Select,
   Separator,
+  Slider,
   set,
   Spinner,
   Stack,
@@ -31,6 +33,8 @@ const loading = atom(true)
 const kindFilter = atom('kind', 'all', { persist: 'plugin' })
 const search = atom('search', '', { persist: 'plugin' })
 const selectedId = atom<number | null>(null)
+const feedHeight = atom('feedHeight', 360, { persist: 'plugin' })
+const detailHeight = atom('detailHeight', 200, { persist: 'plugin' })
 
 const KIND_LABEL: Record<AuditEvent['kind'], string> = {
   output: 'Output',
@@ -110,6 +114,8 @@ export default function Panel() {
   const q = read(search)
   const selId = read(selectedId)
   const isLoading = read(loading)
+  const fHeight = read(feedHeight)
+  const dHeight = read(detailHeight)
 
   const filtered = list.filter((e) => matches(e, kind, q))
   const selected = filtered.find((e) => e.id === selId) ?? filtered[filtered.length - 1]
@@ -179,6 +185,29 @@ export default function Panel() {
         </Text>
       ) : null}
 
+      <Collapsible title="Layout" description="Resize the feed and detail panes">
+        <Stack gap="sm">
+          <Slider
+            label="Feed height"
+            value={fHeight}
+            min={200}
+            max={600}
+            step={20}
+            showValue
+            onChange={(v) => set(feedHeight, v)}
+          />
+          <Slider
+            label="Detail height"
+            value={dHeight}
+            min={120}
+            max={360}
+            step={20}
+            showValue
+            onChange={(v) => set(detailHeight, v)}
+          />
+        </Stack>
+      </Collapsible>
+
       <Separator />
 
       {isLoading && list.length === 0 ? (
@@ -197,7 +226,7 @@ export default function Panel() {
         />
       ) : (
         <>
-          <Box height={360} scroll="y" minHeight={0}>
+          <Box height={fHeight} scroll="y" minHeight={0}>
             <List label="Audit events">
               {filtered.slice(-100).map((e) => (
                 <ListItem
@@ -215,7 +244,7 @@ export default function Panel() {
             <>
               <Separator />
               <Box
-                height={200}
+                height={dHeight}
                 scroll="y"
                 background="card"
                 border
