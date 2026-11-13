@@ -42,6 +42,7 @@ type CliTerminal = {
   worktreeId?: string
   branch?: string
   agentIdentity?: string
+  tabTitle?: string
 }
 
 type CliRead = {
@@ -58,7 +59,10 @@ const state = {
   // Host-mode line tails, keyed by terminal id.
   tails: new Map<string, TailState>(),
   // Terminal metadata learned from either capture path.
-  terminalIndex: new Map<string, { title: string; workspaceId: string | null; path?: string }>(),
+  terminalIndex: new Map<
+    string,
+    { title: string; sessionTitle?: string; workspaceId: string | null; path?: string }
+  >(),
   // CLI cursor per terminal handle.
   cursors: new Map<string, unknown>(),
   cursorsDirty: false,
@@ -206,17 +210,24 @@ function terminalMeta(terminalId: string | undefined) {
   return {
     terminalId,
     terminalTitle: idx?.title || undefined,
+    sessionTitle: idx?.sessionTitle || undefined,
     workspaceId: idx?.workspaceId ?? null,
   }
 }
 
+/** Short display label for a terminal: its title when known, else the id. */
+function terminalLabel(terminalId: string): string {
+  return state.terminalIndex.get(terminalId)?.title || terminalId
+}
+
 function rememberTerminal(
   id: string,
-  info: { title?: string; workspaceId?: string | null; path?: string }
+  info: { title?: string; sessionTitle?: string; workspaceId?: string | null; path?: string }
 ): void {
   const prev = state.terminalIndex.get(id)
   state.terminalIndex.set(id, {
     title: info.title ?? prev?.title ?? '',
+    sessionTitle: info.sessionTitle ?? prev?.sessionTitle,
     workspaceId: info.workspaceId ?? prev?.workspaceId ?? null,
     path: info.path ?? prev?.path,
   })
@@ -292,10 +303,41 @@ function chunkEvents(
   return out
 }
 
+type VisualLayout = { root?: unknown }
+
+/** Maps terminal handle -> its tab's title by walking the visual layout tree.
+ *  Nodes with a `tabs` array recurse per tab (each tab's own title wins);
+ *  nodes with a `handle` record the current tab title. */
+function tabTitlesFromLayouts(layouts: VisualLayout[] | undefined): Map<string, string> {
+  const out = new Map<string, string>()
+  const walk = (node: unknown, tabTitle: string): void => {
+    if (!node || typeof node !== 'object') return
+    if (Array.isArray(node)) {
+      for (const n of node) walk(n, tabTitle)
+      return
+    }
+    const n = node as Record<string, unknown>
+    if (Array.isArray(n.tabs)) {
+      for (const t of n.tabs) {
+        walk(t, typeof (t as { title?: unknown }).title === 'string'
+          ? ((t as { title: string }).title)
+          : tabTitle)
+      }
+      return
+    }
+    if (typeof n.handle === 'string' && tabTitle) out.set(n.handle, tabTitle)
+    walk(n.panes, tabTitle)
+    walk(n.children, tabTitle)
+  }
+  for (const layout of layouts ?? []) walk(layout.root, '')
+  return out
+}
+
 async function pollCli(orca: OrcaWorkerApi, bin: string): Promise<void> {
-  const list = await cliJson<{ terminals?: CliTerminal[] }>(bin, [
-    'terminal', 'list', '--limit', '200',
-  ])
+  const list = await cliJson<{
+    terminals?: CliTerminal[]
+    visualLayouts?: VisualLayout[]
+  }>(bin, ['terminal', 'list', '--limit', '200', '--include-visual-layouts'])
   if (!list?.terminals) {
     if (!state.cliWarned) {
       state.cliWarned = true
@@ -304,7 +346,9 @@ async function pollCli(orca: OrcaWorkerApi, bin: string): Promise<void> {
     return
   }
   state.cliWarned = false
+  const tabTitles = tabTitlesFromLayouts(list.visualLayouts)
   const terminals = list.terminals.filter((t) => t.handle)
+  for (const t of terminals) t.tabTitle = tabTitles.get(t.handle)
   const seen = new Set(terminals.map((t) => t.handle))
 
   // Forget terminals that disappeared.
@@ -326,6 +370,7 @@ async function pollCli(orca: OrcaWorkerApi, bin: string): Promise<void> {
       if (!t) return
       rememberTerminal(t.handle, {
         title: t.title,
+        sessionTitle: t.tabTitle,
         workspaceId: t.worktreeId ?? null,
         path: t.worktreePath,
       })
@@ -520,7 +565,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     const e = event as { terminalId: string; text: string; enter: boolean; inputKind: string }
     rememberTerminal(e.terminalId, {})
     pushEvents(orca, [
-      makeEvent('send', `send → ${e.terminalId}: ${clip(e.text.replace(/\n/g, ' '), 120)}`, {
+      makeEvent('send', `send → ${terminalLabel(e.terminalId)}: ${clip(e.text.replace(/\n/g, ' '), 120)}`, {
         ...terminalMeta(e.terminalId),
         detail: { text: clip(e.text), enter: e.enter, inputKind: e.inputKind },
       }),
@@ -622,7 +667,23 @@ export default function activate(orca: OrcaWorkerApi): void {
   orca.panels.handle('audit.snapshot', async (input) => {
     const limit = input?.limit
     const cap = Math.min(state.settings.maxEvents, Math.max(1, limit ?? state.settings.maxEvents))
-    const events = state.events.slice(-cap)
+    // Fill in terminal titles learned after the event was recorded. Undefined
+    // fields are dropped: the bridge rejects non-JSON values.
+    const events = state.events.slice(-cap).map((e) => {
+      const idx = e.terminalId ? state.terminalIndex.get(e.terminalId) : undefined
+      const out: AuditEvent = { ...e }
+      if (idx) {
+        if (!out.terminalTitle && idx.title) out.terminalTitle = idx.title
+        if (!out.sessionTitle && idx.sessionTitle) out.sessionTitle = idx.sessionTitle
+        if (out.workspaceId == null && idx.workspaceId != null) {
+          out.workspaceId = idx.workspaceId
+        }
+      }
+      for (const k of Object.keys(out) as (keyof AuditEvent)[]) {
+        if (out[k] === undefined) delete out[k]
+      }
+      return out
+    })
     const stats: AuditStats = {
       total: state.events.length,
       byKind: countByKind(),

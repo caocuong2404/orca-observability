@@ -21,8 +21,7 @@
         "id": "observability",
         "title": "Observability",
         "icon": "activity",
-        "entry": "src/panel.tsx",
-        "ui": "components"
+        "entry": "src/panel.html"
       }
     ],
     "commands": [

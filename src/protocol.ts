@@ -18,6 +18,8 @@ export type AuditEvent = {
   /** Terminal the event belongs to, when known. */
   terminalId?: string
   terminalTitle?: string
+  /** Tab/session label for the terminal, when known. */
+  sessionTitle?: string
   workspaceId?: string | null
   /** Structured detail rendered under the event. */
   detail?: Record<string, unknown>

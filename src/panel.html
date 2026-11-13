@@ -1,0 +1,423 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root {
+        --feed-h: 360px;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        font: 13px system-ui, sans-serif;
+        color: var(--orca-foreground);
+        background: var(--orca-background);
+      }
+      .app {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        height: 100%;
+        padding: 12px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      h1 { font-size: 15px; margin: 0; font-weight: 600; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      .grow { flex: 1; min-width: 0; }
+      select, input[type="search"] {
+        width: 100%;
+        font: inherit;
+        color: var(--orca-foreground);
+        background: var(--orca-input, var(--orca-card));
+        border: 1px solid var(--orca-border);
+        border-radius: var(--orca-radius, 6px);
+        padding: 5px 8px;
+      }
+      button {
+        font: inherit;
+        color: var(--orca-foreground);
+        background: transparent;
+        border: 1px solid var(--orca-border);
+        border-radius: var(--orca-radius, 6px);
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      button:hover { background: var(--orca-muted); }
+      .badge {
+        font-size: 11px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--orca-accent);
+        color: var(--orca-accent-foreground);
+      }
+      .muted { color: var(--orca-muted-foreground); font-size: 12px; }
+      .notice {
+        font-size: 12px;
+        color: var(--orca-muted-foreground);
+        border: 1px solid var(--orca-border);
+        border-radius: var(--orca-radius, 6px);
+        padding: 6px 8px;
+        background: var(--orca-muted);
+      }
+      .sep { border: none; border-top: 1px solid var(--orca-border); margin: 0; }
+
+      /* Feed: fixed height, internal scroll, drag-resizable via the handle below it.
+         With no detail selected it grows to fill the panel instead. */
+      #feed {
+        flex: 0 0 auto;
+        height: var(--feed-h);
+        overflow-y: auto;
+        border: 1px solid var(--orca-border);
+        border-radius: var(--orca-radius, 6px);
+      }
+      body.no-detail #feed {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 160px;
+      }
+      #feed .item {
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--orca-border);
+        cursor: pointer;
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      #feed .item:last-child { border-bottom: none; }
+      #feed .item:hover { background: var(--orca-muted); }
+      #feed .item.sel { background: var(--orca-accent); color: var(--orca-accent-foreground); }
+      #feed .item .t {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #feed .item .time { font-size: 11px; opacity: 0.7; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      #feed .item .sess { font-size: 11px; opacity: 0.6; white-space: nowrap; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
+      #feed .item .kind {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        opacity: 0.75;
+        white-space: nowrap;
+      }
+      .empty { padding: 24px 12px; text-align: center; color: var(--orca-muted-foreground); }
+
+      /* Drag handle between feed and detail. */
+      #handle {
+        height: 11px;
+        cursor: ns-resize;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        flex: none;
+      }
+      #handle:hover, #handle.drag { background: var(--orca-muted); }
+      #handle::after {
+        content: "";
+        width: 36px;
+        height: 3px;
+        border-radius: 2px;
+        background: var(--orca-border);
+      }
+      body.dragging, body.dragging * { cursor: ns-resize !important; user-select: none; }
+
+      /* Detail: fills everything below the handle, scrolls internally. */
+      #detailWrap {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      #detail {
+        display: none;
+        flex: 1;
+        min-height: 0;
+        border: 1px solid var(--orca-border);
+        border-radius: var(--orca-radius, 6px);
+        background: var(--orca-card);
+        color: var(--orca-card-foreground);
+        padding: 10px;
+        overflow-y: auto;
+      }
+      #detail .dt { font-weight: 600; margin-bottom: 2px; }
+      #detail .meta { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 12px; color: var(--orca-muted-foreground); }
+      .kbadge {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 1px 7px;
+        border-radius: 999px;
+        background: var(--orca-secondary);
+        color: var(--orca-secondary-foreground);
+      }
+      #detail pre {
+        margin: 0;
+        font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #detail pre code { font: inherit; }
+      /* Prism token colors, mapped onto Orca theme variables. */
+      .token.comment, .token.prolog, .token.cdata { color: var(--orca-muted-foreground); font-style: italic; }
+      .token.string, .token.char, .token.attr-value, .token.regex { color: var(--orca-primary, #2563eb); }
+      .token.keyword, .token.important, .token.rule, .token.atrule { color: var(--orca-accent-foreground, #7c3aed); font-weight: 600; }
+      .token.variable, .token.parameter, .token.property { color: var(--orca-destructive, #dc2626); }
+      .token.number, .token.boolean, .token.constant { color: var(--orca-primary, #2563eb); }
+      .token.operator, .token.punctuation, .token.entity, .token.url { color: var(--orca-muted-foreground); }
+      .token.function, .token.class-name, .token.builtin { color: var(--orca-foreground); font-weight: 600; }
+      .token.tag, .token.selector, .token.attr-name { color: var(--orca-accent-foreground, #7c3aed); }
+      .token.symbol, .token.deleted { color: var(--orca-destructive, #dc2626); }
+      .token.inserted { color: var(--orca-primary, #16a34a); }
+    </style>
+  </head>
+  <body class="no-detail">
+    <div class="app">
+      <header>
+        <h1>Observability</h1>
+        <div class="row">
+          <span class="badge" id="total">0</span>
+          <button id="clear">Clear</button>
+        </div>
+      </header>
+
+      <div id="degraded" class="notice" hidden>
+        Output capture is in fallback mode: the orca CLI was not reachable, so only the
+        focused workspace's terminals are tailed. Commands, prompts, tools and lifecycle
+        events are still recorded.
+      </div>
+
+      <div class="row">
+        <div class="grow">
+          <select id="kind">
+            <option value="all">All events</option>
+            <option value="output">Output</option>
+            <option value="send">Sent</option>
+            <option value="prompt">Prompt</option>
+            <option value="tool">Tool</option>
+            <option value="agent">Agent</option>
+            <option value="workspace">Workspace</option>
+          </select>
+        </div>
+        <div class="grow">
+          <input id="search" type="search" placeholder="Search…" />
+        </div>
+      </div>
+
+      <div class="muted" id="summary"></div>
+      <hr class="sep" />
+
+      <div id="feed"><div class="empty">Loading…</div></div>
+      <div id="handle" title="Drag to resize" style="display:none"></div>
+      <div id="detailWrap" style="display:none"><div id="detail"></div></div>
+    </div>
+
+    <script src="./vendor/prism-core.min.js"></script>
+    <script src="./vendor/prism-bash.min.js"></script>
+    <script>
+      const KIND_LABEL = {
+        output: 'Output', send: 'Sent', prompt: 'Prompt',
+        tool: 'Tool', agent: 'Agent', workspace: 'Workspace'
+      }
+      const MAX_EVENTS = 500
+      const FEED_MIN = 160
+      const FEED_MAX = 800
+      const STORAGE_H = 'ui.feedHeight'
+
+      let events = []
+      let stats = null
+      let kindFilter = 'all'
+      let query = ''
+      let selectedId = null
+      let feedEl, detailEl, searchEl, kindEl, summaryEl, totalEl, degradedEl, handleEl
+
+      const esc = (s) =>
+        String(s).replace(/[&<>"']/g, (c) =>
+          ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
+      function timeOf(ts) {
+        try { return new Date(ts).toLocaleTimeString([], { hour12: false }) }
+        catch { return String(ts) }
+      }
+
+      function detailText(e) {
+        const d = e.detail
+        if (!d) return ''
+        if (Array.isArray(d.lines)) return d.lines.join('\n')
+        return JSON.stringify(d, null, 2)
+      }
+
+      // Bash highlighting via vendored Prism; falls back to plain text.
+      function detailHtml(e) {
+        const text = detailText(e)
+        if (!text) return '(no detail)'
+        if (
+          (e.kind === 'output' || e.kind === 'send' || e.kind === 'prompt') &&
+          window.Prism && Prism.languages && Prism.languages.bash
+        ) {
+          return `<code class="language-bash">${Prism.highlight(text, Prism.languages.bash, 'bash')}</code>`
+        }
+        return esc(text)
+      }
+
+      function filtered() {
+        const q = query.toLowerCase()
+        return events.filter((e) => {
+          if (kindFilter !== 'all' && e.kind !== kindFilter) return false
+          if (!q) return true
+          return `${e.title} ${e.terminalTitle || ''} ${e.terminalId || ''} ${JSON.stringify(e.detail || {})}`
+            .toLowerCase().includes(q)
+        })
+      }
+
+      function render() {
+        const list = filtered()
+        const feed = feedEl
+        if (!events.length) {
+          feed.innerHTML = '<div class="empty">No audit events yet.<br/>Events appear as Orca sends text to terminals, agents run tools, and terminal output streams in.</div>'
+        } else if (!list.length) {
+          feed.innerHTML = '<div class="empty">Nothing matches. Try a different filter or search.</div>'
+        } else {
+          feed.innerHTML = list.slice(-100).reverse().map((e) => `
+            <div class="item${e.id === selectedId ? ' sel' : ''}" data-id="${e.id}">
+              <span class="time">${esc(timeOf(e.ts))}</span>
+              <span class="kind">${esc(KIND_LABEL[e.kind] || e.kind)}</span>
+              <span class="t" title="${esc(e.title)}">${esc(e.title)}</span>
+              <span class="sess">${e.terminalId ? esc(e.sessionTitle || e.terminalTitle || '') : ''}</span>
+            </div>`).join('')
+        }
+        renderDetail(list)
+        renderSummary()
+      }
+
+      function renderDetail(list) {
+        const sel = list.find((e) => e.id === selectedId) || list[list.length - 1]
+        const wrap = document.getElementById('detailWrap')
+        const handle = document.getElementById('handle')
+        if (!sel) {
+          detailEl.style.display = 'none'
+          wrap.style.display = 'none'
+          handle.style.display = 'none'
+          document.body.classList.add('no-detail')
+          return
+        }
+        document.body.classList.remove('no-detail')
+        wrap.style.display = 'flex'
+        handle.style.display = 'flex'
+        detailEl.style.display = 'block'
+        detailEl.innerHTML = `
+          <div class="dt">${esc(sel.title)}</div>
+          <div class="meta">
+            <span>${esc(new Date(sel.ts).toLocaleString())}</span>
+            <span class="kbadge">${esc(KIND_LABEL[sel.kind] || sel.kind)}</span>
+            <span>${sel.terminalId ? esc(sel.sessionTitle || sel.terminalTitle || sel.terminalId) : ''}</span>
+          </div>
+          <pre>${detailHtml(sel)}</pre>`
+      }
+
+      function renderSummary() {
+        const c = (stats && stats.byKind) || {}
+        const parts = [
+          c.send && `${c.send} sent`, c.prompt && `${c.prompt} prompts`,
+          c.tool && `${c.tool} tools`, c.output && `${c.output} output`,
+          c.agent && `${c.agent} agent`, c.workspace && `${c.workspace} ws`
+        ].filter(Boolean)
+        summaryEl.textContent = parts.length
+          ? parts.join(' · ') + (stats ? ` · ${stats.terminals} terminals · ${stats.workspaces} workspaces` : '')
+          : ''
+        totalEl.textContent = stats ? stats.total : events.length
+        degradedEl.hidden = !(stats && stats.degraded)
+      }
+
+      async function refresh() {
+        try {
+          const answer = await orca.plugin.request('audit.snapshot', { limit: MAX_EVENTS })
+          events = answer.events || []
+          stats = answer.stats || null
+          render()
+        } catch (e) {
+          feedEl.innerHTML = `<div class="empty">Worker unavailable: ${esc(e.message || e)}</div>`
+        }
+      }
+
+      function appendBatch(batch) {
+        const seen = new Set(events.map((e) => e.id))
+        const fresh = (batch || []).filter((e) => !seen.has(e.id))
+        if (!fresh.length) return
+        events = events.concat(fresh).slice(-MAX_EVENTS)
+        render()
+      }
+
+      // ---- drag resize ----
+      function setFeedHeight(px) {
+        const h = Math.min(FEED_MAX, Math.max(FEED_MIN, Math.round(px)))
+        document.documentElement.style.setProperty('--feed-h', h + 'px')
+        return h
+      }
+      function persistHeight(h) {
+        orca.storage.set(STORAGE_H, h).catch(() => {})
+      }
+      // ---- wiring (runs in boot after elements are looked up) ----
+      function wire() {
+        feedEl.addEventListener('click', (ev) => {
+          const item = ev.target.closest('.item')
+          if (item) selectedId = Number(item.dataset.id)
+          render()
+        })
+        kindEl.addEventListener('change', () => { kindFilter = kindEl.value; render() })
+        searchEl.addEventListener('input', () => { query = searchEl.value; render() })
+        document.getElementById('clear').addEventListener('click', async () => {
+          try { await orca.plugin.request('audit.clear') } catch {}
+          events = []
+          stats = null
+          render()
+        })
+        handleEl.addEventListener('mousedown', (ev) => {
+          ev.preventDefault()
+          const startY = ev.clientY
+          const startH = feedEl.getBoundingClientRect().height
+          handleEl.classList.add('drag')
+          document.body.classList.add('dragging')
+          function move(e2) {
+            setFeedHeight(startH + (e2.clientY - startY))
+          }
+          function up(e2) {
+            document.removeEventListener('mousemove', move)
+            document.removeEventListener('mouseup', up)
+            handleEl.classList.remove('drag')
+            document.body.classList.remove('dragging')
+            persistHeight(setFeedHeight(startH + (e2.clientY - startY)))
+          }
+          document.addEventListener('mousemove', move)
+          document.addEventListener('mouseup', up)
+        })
+        orca.plugin.on('audit.events', (payload) => appendBatch(payload && payload.events))
+        orca.plugin.on('audit.cleared', () => { events = []; stats = null; render() })
+      }
+
+      async function boot() {
+        feedEl = document.getElementById('feed')
+        detailEl = document.getElementById('detail')
+        searchEl = document.getElementById('search')
+        kindEl = document.getElementById('kind')
+        summaryEl = document.getElementById('summary')
+        totalEl = document.getElementById('total')
+        degradedEl = document.getElementById('degraded')
+        handleEl = document.getElementById('handle')
+        wire()
+        try {
+          const saved = await orca.storage.get(STORAGE_H)
+          if (typeof saved === 'number') setFeedHeight(saved)
+        } catch {}
+        await refresh()
+      }
+      void boot()
+    </script>
+  </body>
+</html>
