@@ -1,0 +1,99 @@
+{
+  "manifestVersion": 2,
+  "id": "observability",
+  "name": "Observability",
+  "version": "0.1.0",
+  "description": "An audit trail for Orca: terminal output, text sent to terminals, agent prompts and tool calls, and workspace and agent events, streamed into a sidebar feed.",
+  "author": {
+    "name": "caocuong2404"
+  },
+  "repository": "https://github.com/caocuong2404/orca-observability",
+  "license": "MIT",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "observability",
+        "title": "Observability",
+        "icon": "activity",
+        "entry": "src/panel.tsx",
+        "ui": "components"
+      }
+    ],
+    "commands": [
+      {
+        "id": "observability.clear",
+        "title": "Observability: Clear audit feed"
+      }
+    ],
+    "events": [
+      { "on": "workspace.created" },
+      { "on": "workspace.removed" },
+      { "on": "agent.status.changed" },
+      { "on": "workspace.changed" }
+    ],
+    "hooks": [
+      { "event": "terminal.send" },
+      { "event": "agent.prompt.before" },
+      { "event": "agent.tool.before" },
+      { "event": "agent.tool.after" }
+    ],
+    "settings": [
+      {
+        "key": "pollSeconds",
+        "title": "Terminal output poll interval (seconds)",
+        "description": "How often the worker reads each terminal's newest output. Lower values catch more output but cost more host calls.",
+        "type": "number",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 60
+      },
+      {
+        "key": "captureOutput",
+        "title": "Capture terminal output",
+        "description": "Tail every terminal's output stream into the audit feed. Turn off to record only commands, prompts, tools and lifecycle events.",
+        "type": "boolean",
+        "default": true
+      },
+      {
+        "key": "maxEvents",
+        "title": "Audit feed size",
+        "description": "Maximum events kept in memory and shown in the panel. Older events are dropped.",
+        "type": "integer",
+        "default": 500,
+        "minimum": 50,
+        "maximum": 5000
+      },
+      {
+        "key": "outputChunkLines",
+        "title": "Output lines per event",
+        "description": "Maximum terminal output lines stored per audit event. Longer bursts are split into multiple events.",
+        "type": "integer",
+        "default": 200,
+        "minimum": 20,
+        "maximum": 1000
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "audit-count",
+        "text": "audit",
+        "icon": "activity",
+        "tone": "neutral",
+        "tooltip": "Observability audit feed"
+      }
+    ]
+  },
+  "capabilities": [
+    { "kind": "workspace:read" },
+    { "kind": "terminal:read" },
+    { "kind": "agent:read" },
+    { "kind": "storage:own" },
+    { "kind": "settings:own" }
+  ]
+}
